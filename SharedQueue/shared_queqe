@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+#include <unistd.h>
+
+#define MAX_QUEUE_SIZE 100
+
+// Shared queue using linked list with a Node structure
+struct Node {
+    char* data;
+    struct Node* next;
+};
+
+struct SharedQueue {
+    struct Node* head;
+    struct Node* tail;
+    pthread_mutex_t mutex;
+    pthread_cond_t cv;
+};
+
+struct SharedQueue sharedQueue = { NULL, NULL, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
+
+// Function to enqueue a string
+void enqueue(const char* item) {
+    struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
+    newNode->data = strdup(item);
+    newNode->next = NULL;
+
+    pthread_mutex_lock(&sharedQueue.mutex);
+
+    if (sharedQueue.head == NULL) {
+        sharedQueue.head = newNode;
+        sharedQueue.tail = newNode;
+    } else {
+        sharedQueue.tail->next = newNode;
+        sharedQueue.tail = newNode;
+    }
+
+    pthread_cond_signal(&sharedQueue.cv);
+    pthread_mutex_unlock(&sharedQueue.mutex);
+}
+
+// Function to dequeue a string
+char* dequeue() {
+    pthread_mutex_lock(&sharedQueue.mutex);
+
+    while (sharedQueue.head == NULL) {
+        pthread_cond_wait(&sharedQueue.cv, &sharedQueue.mutex);
+    }
+
+    struct Node* node = sharedQueue.head;
+    sharedQueue.head = sharedQueue.head->next;
+    char* item = node->data;
+    free(node);
+
+    pthread_mutex_unlock(&sharedQueue.mutex);
+
+    return item;
+}
+
+// Function to simulate the writer thread
+void* writer(void* arg) {
+    char* data[] = {"Message1", "Message2", "Message3", "Message4", "Message5"};
+
+    int idx = 0;
+    while (1) {
+        enqueue(data[idx]);
+        idx = (idx + 1) % 5;
+        usleep(200000); // Add messages every 200 milliseconds (5 messages per second)
+    }
+
+    return NULL;
+}
+
+// Function to simulate a reader thread
+void* reader(void* arg) {
+    int id = *(int*)arg;
+
+    while (1) {
+        char* item = dequeue();
+        printf("Reader %d: Received message: %s\n", id, item);
+        free(item);
+    }
+
+    return NULL;
+}
+
+int main() {
+    pthread_t writer_thread;
+    pthread_t reader_threads[5];
+
+    pthread_create(&writer_thread, NULL, writer, NULL);
+
+    int reader_ids[5];
+    for (int i = 0; i < 5; i++) {
+        reader_ids[i] = i + 1;
+        pthread_create(&reader_threads[i], NULL, reader, &reader_ids[i]);
+    }
+
+    pthread_join(writer_thread, NULL);
+
+    for (int i = 0; i < 5; i++) {
+        pthread_join(reader_threads[i], NULL);
+    }
+
+    return 0;
+}
