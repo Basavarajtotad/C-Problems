@@ -13,11 +13,12 @@ struct Node {
 };
 
 struct SharedQueue {
-    struct Node* head;
+    struct Node* head; 
     struct Node* tail;
     pthread_mutex_t mutex;
     pthread_cond_t cv;
 };
+
 
 struct SharedQueue sharedQueue = { NULL, NULL, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
 

@@ -20,6 +20,7 @@ typedef struct {
     char *name;
 } typenamePair;
 
+
 // Structure for a hash table
 typedef struct {
     typenamePair *table[TABLE_SIZE];
